@@ -14,19 +14,25 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env (same level as manage.py)
+# Load .env (same level as manage.py) - local dev only
 load_dotenv(BASE_DIR / ".env")
 
 # =========================
 # Core ENV
 # =========================
+# Render will use ENV vars; local dev can use .env
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'unsafe-secret-key')
-DEBUG = os.getenv('DEBUG', '0') in ('1','true','True','yes','YES')
+SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-secret-key")
+DEBUG = os.getenv("DEBUG", "0") in ("1", "true", "True", "yes", "YES")
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()]
-if not ALLOWED_HOSTS and DEBUG:
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+# Allow hosts (Render sets host dynamically; easiest is to include env)
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
+if not ALLOWED_HOSTS:
+    if DEBUG:
+        ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+    else:
+        # Render / production fallback
+        ALLOWED_HOSTS = ["*"]
 
 # =========================
 # Applications
@@ -56,6 +62,9 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
 
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise for static files on Render
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
 
@@ -123,12 +132,20 @@ USE_TZ = True
 # Static files
 # =========================
 
-STATIC_URL = "static/"
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+# Only use STATICFILES_DIRS if the folder exists (avoids collectstatic issues)
+_static_dir = BASE_DIR / "static"
+if _static_dir.exists():
+    STATICFILES_DIRS = [_static_dir]
+
+# WhiteNoise storage (optional but recommended)
+STORAGES = {
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =========================
 # Django REST Framework + JWT
@@ -183,4 +200,3 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
-
