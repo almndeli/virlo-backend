@@ -16,7 +16,7 @@ urlpatterns = [
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # API (direct)
-    path("api/velocity-est/", velocity_est),
+    # removed velocity_est route for render deploy
 
     # API (core)
     path("api/", include("core.urls")),
@@ -24,5 +24,7 @@ urlpatterns = [
     # Frontend
     path("app/", include("core.front_urls")),
 ]
+
+
 
 
