@@ -33,7 +33,7 @@ if not ALLOWED_HOSTS and DEBUG:
 # =========================
 
 INSTALLED_APPS = [
-    'trends',
+    # 'trends',  # removed for render deploy
     "corsheaders",
 
     "django.contrib.admin",
@@ -183,3 +183,4 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
+
