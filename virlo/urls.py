@@ -6,7 +6,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from virlo.api.velocity_views import velocity_est
+# removed virlo.api import for render deploy
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -24,3 +24,5 @@ urlpatterns = [
     # Frontend
     path("app/", include("core.front_urls")),
 ]
+
+
