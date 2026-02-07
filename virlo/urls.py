@@ -1,4 +1,4 @@
-from django.contrib import admin
+﻿from django.contrib import admin
 from django.urls import path, include
 
 from rest_framework_simplejwt.views import (
@@ -6,16 +6,21 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
+from virlo.api.velocity_views import velocity_est
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # ✅ JWT
+    # JWT
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
-    # ✅ API app
+    # API (direct)
+    path("api/velocity-est/", velocity_est),
+
+    # API (core)
     path("api/", include("core.urls")),
 
-    # ✅ Frontend
-    path("app/", include("core.front_urls")),  # إذا عندك front_urls
+    # Frontend
+    path("app/", include("core.front_urls")),
 ]

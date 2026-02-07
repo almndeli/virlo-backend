@@ -5,14 +5,12 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.decorators import api_view, permission_classes
 
 from .models import Trend
 from .serializers import TrendSerializer
 
 
-# -------------------------
-# Pagination (Unified response)
-# -------------------------
 class UnifiedLimitOffsetPagination(LimitOffsetPagination):
     default_limit = 20
     max_limit = 100
@@ -34,20 +32,16 @@ class UnifiedLimitOffsetPagination(LimitOffsetPagination):
 
 class PublicUnifiedPagination(UnifiedLimitOffsetPagination):
     default_limit = 5
-    max_limit = 5  # public stays small
+    max_limit = 5
 
 
-# -------------------------
-# Helpers
-# -------------------------
 ALLOWED_ORDERING = {"created_at", "-created_at", "score", "-score", "id", "-id"}
 
 
 def apply_filters_and_ordering(request, qs):
-    # Filters
     platform = request.query_params.get("platform")
     keyword = request.query_params.get("keyword")
-    q = request.query_params.get("q")  # quick search
+    q = request.query_params.get("q")
 
     if platform:
         qs = qs.filter(platform__iexact=platform.strip())
@@ -59,7 +53,6 @@ def apply_filters_and_ordering(request, qs):
         q = q.strip()
         qs = qs.filter(keyword__icontains=q) | qs.filter(platform__icontains=q)
 
-    # Ordering
     ordering = request.query_params.get("ordering", "-created_at").strip()
     if ordering not in ALLOWED_ORDERING:
         ordering = "-created_at"
@@ -67,42 +60,114 @@ def apply_filters_and_ordering(request, qs):
     return qs.order_by(ordering)
 
 
-# -------------------------
-# ViewSets
-# -------------------------
 class TrendViewSet(viewsets.ModelViewSet):
     serializer_class = TrendSerializer
 
     def get_permissions(self):
-        # Public read-only for demo
         if self.request.method == "GET":
             return [AllowAny()]
         return [IsAuthenticated()]
+
     permission_classes = [IsAuthenticated]
     pagination_class = UnifiedLimitOffsetPagination
 
     def get_queryset(self):
-        # latest record per (platform, keyword)
         latest_ids = (
             Trend.objects.values("platform", "keyword")
             .annotate(latest_id=Max("id"))
             .values_list("latest_id", flat=True)
         )
-
         qs = Trend.objects.filter(id__in=list(latest_ids))
-        qs = apply_filters_and_ordering(self.request, qs)
-        return qs
+        return apply_filters_and_ordering(self.request, qs)
 
 
 class PublicTrendsViewSet(TrendViewSet):
     permission_classes = [AllowAny]
-    http_method_names = ["get"]  # public read-only
+    http_method_names = ["get"]
     pagination_class = PublicUnifiedPagination
-
-    def get_queryset(self):
-        # same logic as TrendViewSet but stays small via pagination max_limit=5
-        return super().get_queryset()
 
 
 def virlo_app(request):
     return render(request, "virlo/app.html")
+
+
+def compute_decision(score):
+    if score >= 70:
+        return "BUY"
+    elif score >= 50:
+        return "WATCH"
+    return "DROP"
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def signal_latest(request):
+    t = Trend.objects.order_by("-created_at").first()
+    if not t:
+        return Response({"status": "NoData", "score": None, "decision": None})
+
+    score = float(t.score)
+    decision = compute_decision(score)
+    status = "Growing" if score >= 50 else "Flat"
+
+    return Response(
+        {
+            "status": status,
+            "score": score,
+            "decision": decision,
+            "platform": t.platform,
+            "keyword": t.keyword,
+            "created_at": t.created_at,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def signal_history(request):
+    limit = int(request.GET.get("limit", 10))
+
+    platform = request.GET.get("platform")
+    keyword = request.GET.get("keyword")
+    q = request.GET.get("q")
+
+    qs = Trend.objects.all()
+
+    if platform:
+        qs = qs.filter(platform__iexact=platform.strip())
+    if keyword:
+        qs = qs.filter(keyword__iexact=keyword.strip())
+    if q:
+        q = q.strip()
+        qs = qs.filter(keyword__icontains=q) | qs.filter(platform__icontains=q)
+
+    trends = qs.order_by("-created_at")[:limit]
+
+    return Response(
+        [
+            {
+                "date": t.created_at,
+                "score": t.score,
+                "decision": compute_decision(float(t.score)),
+                "velocity_label": "Growing",
+            }
+            for t in trends
+        ]
+    )
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def trends_list(request):
+    """
+    Public endpoint: GET /api/trends/?limit=&offset=&platform=&keyword=&q=&ordering=
+    Returns: { meta: {...}, results: [...] }
+    """
+    qs = Trend.objects.all()
+    qs = apply_filters_and_ordering(request, qs)
+
+    paginator = UnifiedLimitOffsetPagination()
+    page = paginator.paginate_queryset(qs, request)
+
+    serializer = TrendSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+

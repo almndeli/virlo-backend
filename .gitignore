@@ -29,3 +29,16 @@ staticfiles/
 Thumbs.db
 .vscode/
 .idea/
+
+.env
+
+
+node_modules/
+
+
+# local data & dumps
+data/
+trends/
+*.bak_*
+*_patch_*.py
+

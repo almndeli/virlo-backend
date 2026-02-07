@@ -1,15 +1,8 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import virlo_app, TrendViewSet, PublicTrendsViewSet
-
-router = DefaultRouter()
-router.register(r"trends", TrendViewSet, basename="trends")
-router.register(r"public/trends", PublicTrendsViewSet, basename="public-trends")
+﻿from django.urls import path
+from . import views
 
 urlpatterns = [
-    # Frontend
-    path("app/", virlo_app),
-
-    # API
-    path("", include(router.urls)),
+    path("signal/latest/", views.signal_latest),
+    path("signal/history/", views.signal_history),
+    path("trends/", views.trends_list),
 ]
